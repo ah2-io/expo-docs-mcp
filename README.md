@@ -11,6 +11,8 @@ A Model Context Protocol (MCP) server that provides access to Expo documentation
 - 🚀 **Quick Start Guides**: Platform-specific getting started guides
 - 📦 **Version Support**: Access documentation for different SDK versions
 - 💾 **Smart Caching**: 1-week cache for optimal performance
+- 📱 **Offline First**: Downloads and indexes documentation locally for fast, reliable access
+- 🔎 **Fuzzy Search**: Advanced search with exact, partial, and fuzzy matching
 
 ## Installation
 
@@ -96,16 +98,21 @@ npm run build
 ### Scripts
 
 - `npm run build` - Build the TypeScript project
-- `npm run dev` - Watch mode for development
+- `npm run dev` - Watch mode for development  
 - `npm start` - Run the built server
+- `npm run download-docs` - Download and cache Expo documentation
+- `npm run init` - Build and download docs (first-time setup)
 
 ### Project Structure
 
 ```
 ├── src/
-│   ├── index.ts              # MCP server setup and tool handlers
-│   └── expo-docs-fetcher.ts  # Documentation fetching logic
-├── dist/                      # Compiled JavaScript output
+│   ├── index.ts                    # MCP server setup and tool handlers
+│   ├── offline-docs-fetcher.ts     # Offline documentation management and search
+│   ├── download-docs.ts            # Documentation download from GitHub
+│   └── expo-docs-fetcher.ts        # Online documentation fetching (legacy)
+├── docs-cache/                     # Downloaded documentation files
+├── dist/                           # Compiled JavaScript output
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -113,10 +120,11 @@ npm run build
 
 ## How It Works
 
-1. **Documentation Fetching**: The server fetches documentation from docs.expo.dev
-2. **HTML to Markdown**: Converts HTML content to clean Markdown for better readability
-3. **Smart Caching**: Caches responses for 1 week to reduce API calls and improve performance
-4. **Version Support**: Handles different SDK versions through URL path manipulation
+1. **Documentation Download**: On first run, downloads Expo documentation from GitHub (expo/expo repository)
+2. **Local Indexing**: Builds a searchable index of all documentation files with metadata extraction
+3. **Fuzzy Search**: Provides multiple search strategies including exact matching, partial matching, and fuzzy search
+4. **Smart Caching**: Caches search results and content for 1 week to improve performance
+5. **Offline Operation**: Works entirely offline after initial documentation download
 
 ## Contributing
 

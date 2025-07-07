@@ -9,7 +9,7 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ExpoDocsFetcher } from './expo-docs-fetcher.js';
+import { OfflineDocsFetcher } from './offline-docs-fetcher.js';
 
 const server = new Server(
   {
@@ -23,7 +23,7 @@ const server = new Server(
   },
 );
 
-const docsFetcher = new ExpoDocsFetcher();
+const docsFetcher = new OfflineDocsFetcher();
 
 const tools: Tool[] = [
   {
@@ -149,7 +149,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_expo_doc_content':
         if (args.url) {
-          return await docsFetcher.getDocContent(args.url as string);
+          // For URL, we'll try to extract a path from it
+          const url = args.url as string;
+          const urlPath = url.replace('https://docs.expo.dev/', '').replace(/^\/+/, '');
+          return await docsFetcher.getDocByPath(urlPath, args.version as string | undefined);
         } else {
           return await docsFetcher.getDocByPath(
             args.path as string | undefined, 

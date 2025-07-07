@@ -11,6 +11,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "download-docs": "node dist/download-docs.js",
+    "init": "npm run build && npm run download-docs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
