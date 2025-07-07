@@ -428,21 +428,60 @@ export class OfflineDocsFetcher {
   async getDocByPath(path?: string, version?: string) {
     await this.ensureInitialized();
     
-    let searchPath = '';
-    if (version && version !== 'latest') searchPath += `**/${version}`;
-    if (path) searchPath += `/**/*${path}*`;
-    searchPath += '.{md,mdx}';
-    
-    try {
-      const files = await glob(searchPath, { cwd: this.docsDir });
-      if (files.length === 0) {
-        throw new Error('Document not found');
-      }
-      
-      return await this.getDocContent(files[0]);
-    } catch (error) {
-      throw new Error(`Failed to find document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (!path) {
+      throw new Error('Path is required');
     }
+    
+    // Try multiple search patterns to find the document
+    const searchPatterns = [];
+    
+    // Pattern 1: Direct path matching (most specific)
+    if (version && version !== 'latest') {
+      searchPatterns.push(`**/${version}/**/*${path}*.{md,mdx}`);
+    }
+    
+    // Pattern 2: Search for the full path as a substring
+    searchPatterns.push(`**/*${path}*.{md,mdx}`);
+    
+    // Pattern 3: Search for the path components individually
+    const pathParts = path.split('/').filter(part => part.length > 0);
+    if (pathParts.length > 1) {
+      // Create a pattern that matches the directory structure
+      searchPatterns.push(`**/${pathParts.join('/')}*.{md,mdx}`);
+      searchPatterns.push(`**/${pathParts.join('/**/*')}*.{md,mdx}`);
+    }
+    
+    // Pattern 4: Search for just the filename if path contains slashes
+    if (path.includes('/')) {
+      const filename = path.split('/').pop();
+      if (filename) {
+        searchPatterns.push(`**/*${filename}*.{md,mdx}`);
+      }
+    }
+    
+    // Try each pattern until we find matches
+    for (const pattern of searchPatterns) {
+      try {
+        const files = await glob(pattern, { cwd: this.docsDir });
+        if (files.length > 0) {
+          // Sort by relevance - prefer exact matches
+          const sortedFiles = files.sort((a, b) => {
+            const aContainsPath = a.includes(path);
+            const bContainsPath = b.includes(path);
+            if (aContainsPath && !bContainsPath) return -1;
+            if (!aContainsPath && bContainsPath) return 1;
+            return a.length - b.length; // Prefer shorter paths
+          });
+          
+          return await this.getDocContent(sortedFiles[0]);
+        }
+      } catch (globError) {
+        // Continue trying other patterns
+        continue;
+      }
+    }
+    
+    throw new Error(`Document not found for path: ${path}`);
   }
 
   async listSections(section?: string, version?: string) {
