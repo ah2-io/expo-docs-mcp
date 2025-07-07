@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run download-docs:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm publish:*)"
+    ],
+    "deny": []
+  }
+}

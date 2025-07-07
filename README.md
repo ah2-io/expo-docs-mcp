@@ -134,6 +134,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Credits
+## About
 
-Inspired by the [Amplify Gen1 MCP Server](https://github.com/danlmarmot/amplify-gen1-mcp-server) architecture.
+This MCP server is developed by [ah2.io](https://ah2.io), a software development company focused on building innovative tools and solutions for developers and businesses.
