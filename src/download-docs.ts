@@ -1,76 +1,59 @@
-import axios from 'axios';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const GITHUB_API_BASE = 'https://api.github.com/repos/expo/expo';
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/expo/expo';
-const COMMIT_SHA = 'main'; // Use main branch for latest docs
+const REPO_URL = 'https://github.com/expo/expo.git';
 const DOCS_DIR = path.join(__dirname, '..', 'docs-cache');
-
-interface GitHubFile {
-  name: string;
-  path: string;
-  type: 'file' | 'dir';
-  download_url?: string;
-}
+const TEMP_DIR = path.join(__dirname, '..', 'temp-expo-repo');
 
 async function ensureDirectory(dir: string) {
   await fs.ensureDir(dir);
 }
 
-async function downloadFile(url: string, filePath: string) {
+async function cloneAndExtractDocs() {
+  console.log('Cloning Expo repository...');
+  
+  // Remove temp directory if it exists
+  await fs.remove(TEMP_DIR);
+  
   try {
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-    await fs.writeFile(filePath, response.data);
-    console.log(`Downloaded: ${filePath}`);
-  } catch (error) {
-    console.error(`Failed to download ${url}: ${error}`);
-  }
-}
-
-async function fetchDirectoryContents(path: string): Promise<GitHubFile[]> {
-  try {
-    const url = `${GITHUB_API_BASE}/contents/${path}?ref=${COMMIT_SHA}`;
-    const response = await axios.get(url, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        // Add GitHub token if you have one to avoid rate limits
-        // 'Authorization': `token ${process.env.GITHUB_TOKEN}`
-      }
-    });
-    return response.data;
-  } catch (error) {
-    console.error(`Failed to fetch directory ${path}: ${error}`);
-    return [];
-  }
-}
-
-async function downloadMDXFiles(githubPath: string, localPath: string, maxDepth = 3, currentDepth = 0) {
-  if (currentDepth >= maxDepth) {
-    return;
-  }
-  
-  await ensureDirectory(localPath);
-  
-  const files = await fetchDirectoryContents(githubPath);
-  
-  for (const file of files) {
-    if (file.type === 'file' && (file.name.endsWith('.mdx') || file.name.endsWith('.md'))) {
-      const localFilePath = path.join(localPath, file.name);
-      const rawUrl = `${GITHUB_RAW_BASE}/${COMMIT_SHA}/${file.path}`;
-      await downloadFile(rawUrl, localFilePath);
-    } else if (file.type === 'dir' && currentDepth < maxDepth - 1) {
-      // Skip certain directories that are not documentation
-      const skipDirs = ['node_modules', '.git', 'build', 'dist', 'coverage', 'tests', '__tests__', 'test'];
-      if (!skipDirs.includes(file.name)) {
-        const newLocalPath = path.join(localPath, file.name);
-        await downloadMDXFiles(file.path, newLocalPath, maxDepth, currentDepth + 1);
-      }
+    // Clone the repository with sparse checkout to only get docs
+    await execAsync(`git clone --depth 1 --filter=blob:none --sparse ${REPO_URL} ${TEMP_DIR}`);
+    
+    // Configure sparse checkout to include docs directory
+    await execAsync(`cd ${TEMP_DIR} && git sparse-checkout set docs`);
+    
+    // Check if docs directory exists
+    const docsSourcePath = path.join(TEMP_DIR, 'docs');
+    if (await fs.pathExists(docsSourcePath)) {
+      console.log('Copying documentation files...');
+      
+      // Copy docs directory to cache
+      await fs.copy(docsSourcePath, DOCS_DIR, {
+        filter: (src) => {
+          // Only copy .mdx and .md files, and directories
+          const ext = path.extname(src);
+          return ext === '' || ext === '.mdx' || ext === '.md' || ext === '.json';
+        }
+      });
+      
+      console.log('Documentation files copied successfully!');
+    } else {
+      console.warn('docs directory not found in repository');
     }
+    
+  } catch (error) {
+    console.error('Error cloning repository:', error);
+    throw error;
+  } finally {
+    // Clean up temp directory
+    await fs.remove(TEMP_DIR);
   }
 }
 
@@ -83,16 +66,12 @@ export async function downloadAllDocs() {
   await ensureDirectory(DOCS_DIR);
   
   try {
-    // Download docs from the main docs directory
-    await downloadMDXFiles('docs', DOCS_DIR);
-    
-    // Also download pages directory which contains additional documentation
-    await downloadMDXFiles('docs/pages', path.join(DOCS_DIR, 'pages'));
+    // Clone repository and extract docs
+    await cloneAndExtractDocs();
     
     // Create metadata file
     const metadata = {
       downloadDate: new Date().toISOString(),
-      commitSha: COMMIT_SHA,
       baseUrl: 'https://docs.expo.dev',
       source: 'https://github.com/expo/expo/tree/main/docs'
     };
